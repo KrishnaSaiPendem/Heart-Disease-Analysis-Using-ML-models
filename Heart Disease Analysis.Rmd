@@ -1,0 +1,506 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+```{r}
+setwd("/Users/krishna/Desktop/SEM 1/STAT/Final Project/Datasets/")
+heart_df <- read.csv("heart.csv")
+head(heart_df)
+```
+
+EXPLORATORY DATA ANALYSIS
+
+
+
+```{r}
+summary(heart_df)
+```
+Summary of Heart Disease Dataset, Explaining about the Min, 1st Qu, Median, Mean, 3rd Qu and Max of the different variables in the dataset.
+
+
+
+#Checking NA values in the dataset.
+```{r}
+sum_of_na_values <- sum(is.na(heart_df))
+sum_of_na_values
+```
+We can see there are no NA values in the Heart Disease Dataset and We can proceed further in the project.
+
+
+
+
+```{r}
+unique_values_of_df <- unique(heart_df)
+unique_values_of_df
+```
+
+
+
+
+```{r}
+dim(heart_df)
+
+cat("There are ", nrow(heart_df), "number of rows \n")
+cat("There are ", ncol(heart_df), "number of columns")
+```
+
+```{r}
+heart_df_corr <- cor(heart_df)
+heart_df_corr
+```
+
+
+
+#Plotting Bar Plot of Target
+```{r}
+library(ggplot2)
+
+# Bar plot of Target variable
+ggplot(heart_df, aes(x = factor(target), fill = factor(target))) +
+  geom_bar() +
+  labs(title = "Distribution of Target Variable", x = "Target", y = "Count") +
+  scale_fill_discrete(name = "Target")
+
+
+```
+From this bar plot, we can see individuals with no heart disease('0') are below 500 and Persons with heart disease('1') are more than 500 individuals. 
+
+
+
+#Plotting Violin Plot to show distribution of the feature by the target variables.
+```{r}
+library(ggplot2)
+
+# Violin plot
+ggplot(heart_df, aes(x = factor(target), y = thalach, fill = factor(target))) +
+  geom_violin() +
+  labs(title = "Distribution of thalach by Target Variable", x = "Target", y = "thalach") +
+  scale_fill_discrete(name = "Target")
+
+
+```
+
+
+
+
+
+```{r}
+library(ggplot2)
+
+# Density plot
+ggplot(heart_df, aes(x = cp, fill = factor(target))) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Density Plot of CP by Target Variable", x = "CP", y = "Density") +
+  scale_fill_discrete(name = "Target")
+
+```
+
+
+
+
+
+
+
+
+#Plotting heatmap of Heart Disease Dataset.
+```{r}
+# Load libraries
+library(ggplot2)
+library(reshape2)
+
+# Melt correlation matrix into long format
+heart_corr_melted <- melt(heart_df_corr)
+
+# Create heatmap
+ggplot(heart_corr_melted, aes(x = Var2, y = Var1, fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#f7fbff", mid = "blue", high = "red", midpoint = 0,
+                       name = "Correlation", na.value = "white", guide = "colorbar") +
+  labs(title = "Heart Disease Correlation Heatmap", x = "", y = "") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 12),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12))
+```
+
+
+```{r}
+heart_df$target <- as.factor(heart_df$target)
+is.factor(heart_df$target)
+```
+
+
+
+
+
+
+1) RESEARCH QUESTION
+Which classification method (logistic regression, decision trees, KNN, random forest) resulted in the highest accuracy in predicting the presence of heart disease in individuals?
+
+
+
+
+Using Train and Test method
+```{r}
+#make this example reproducible
+set.seed(234)
+
+#use 80% of dataset as training set and 20% as test set
+sample <- sample(c(TRUE, FALSE), nrow(heart_df), replace=TRUE, prob=c(0.7,0.3))
+train  <- heart_df[sample, ]
+test   <- heart_df[!sample, ]
+
+print("70% of Train Data")
+dim(train)
+print("30% of Test Data")
+dim(test)
+```
+
+
+
+
+LOGISTIC REGRESSION 
+
+```{r}
+# Logistic Regression Model with Train & Test Method
+library(caret)
+
+# Fit the model on the training set
+logistic_classification <- glm(target ~ ., data = train, family = 'binomial')
+summary(logistic_classification)
+
+# Make predictions on the test set
+predictions_logistic_classification <- predict(logistic_classification, newdata = test, type = "response")
+
+# Convert probabilities to class predictions
+predictionClass_logistic_classification <- ifelse(predictions_logistic_classification > 0.5, 1, 0)
+
+# Create the confusion matrix
+conf_matrix_logistic_classification <- confusionMatrix(factor(predictionClass_logistic_classification), factor(test$target))
+conf_matrix_logistic_classification
+
+# Extract the accuracy metric
+accuracy_logistic_classification <- conf_matrix_logistic_classification$overall['Accuracy']
+accuracy_logistic_classification
+
+
+```
+
+
+CONFUSION MATRIX OF LOGISTIC CLASSIFICATION
+```{r}
+# Assuming conf_matrix is a table object created by confusionMatrix()
+conf_matrix_logistic_classification <- as.data.frame(conf_matrix_logistic_classification$table)
+
+# Plot confusion matrix as a heatmap
+library(ggplot2)
+ggplot(conf_matrix_logistic_classification, aes(Prediction, Reference, fill = log(Freq))) +
+  geom_tile() +
+  scale_fill_gradient(low = "red", high = "blue", na.value = "grey50", trans = "log") +
+  geom_text(aes(label = Freq), size = 10, color = "white") +
+  xlab("Predicted Class") +
+  ylab("True Class") +
+  ggtitle("Confusion Matrix of Logistic Classification") +
+  theme_minimal()
+
+```
+
+
+
+K-NEAREST NEIGHBOURS CLASSIFICATION
+
+```{r}
+# Scale the predictors
+preProcValues_knn <- preProcess(train[, -14], method = c("center", "scale"))
+train[, -14] <- predict(preProcValues_knn, train[, -14])
+test[, -14] <- predict(preProcValues_knn, test[, -14])
+
+# Train the KNN model
+k <- 5
+knnmodel <- train(target ~ ., data = train, method = "knn", trControl = trainControl(method = "cv", number = 5), preProcess = c("center", "scale"), tuneLength = 10, metric = "Accuracy", tuneGrid = expand.grid(k = k))
+summary(knnmodel)
+# Print the accuracy and confusion matrix on the testing set
+predictions_knn <- predict(knnmodel, newdata = test)
+confusion_matrix_knn <- confusionMatrix(predictions_knn, test$target)
+print(paste0("Accuracy: ", confusion_matrix_knn$overall["Accuracy"]))
+print(confusion_matrix_knn$table)
+
+accuracy_knn_classification <- confusion_matrix_knn$overall['Accuracy']
+accuracy_knn_classification
+```
+CONFUSION MATRIX OF K-NEAREST NEIGHBOURS CLASSIFICATION
+```{r}
+# Assuming conf_matrix is a table object created by confusionMatrix()
+conf_matrix_knn <- as.data.frame(confusion_matrix_knn$table)
+
+# Plot confusion matrix as a heatmap
+library(ggplot2)
+ggplot(conf_matrix_knn, aes(Prediction, Reference, fill = log(Freq))) +
+  geom_tile() +
+  scale_fill_gradient(low = "red", high = "blue", na.value = "grey50", trans = "log") +
+  geom_text(aes(label = Freq), size = 10, color = "white") +
+  xlab("Predicted Class") +
+  ylab("True Class") +
+  ggtitle("Confusion Matrix OF KNN") +
+  theme_minimal()
+```
+
+
+
+
+Random Forest Classification
+```{r}
+#Random forest Classification
+library(randomForest)
+library(caret)
+
+
+# Train the random forest model
+rf_model <- randomForest(target ~ ., data=train, ntree=500, mtry=3)
+summary(rf_model)
+# Make predictions on the test data
+rf_predictions <- predict(rf_model, test)
+
+# Evaluate the model
+rf_cm <- table(rf_predictions, test$target)
+rf_acc <- sum(diag(rf_cm)) / sum(rf_cm) 
+
+# Print the results
+print(paste("Random Forest Accuracy:", rf_acc))
+
+rf_cm
+
+
+```
+
+
+
+CONFUSION MATRIX OF RANDOM FOREST CLASSIFICATION
+```{r}
+# Assuming conf_matrix is a table object created by confusionMatrix()
+conf_matrix_RFC <- as.data.frame(rf_cm)
+
+# Rename the column names in conf_matrix_RFC to match the expected names
+names(conf_matrix_RFC) <- c("Reference", "Prediction", "Freq")
+
+# Plot confusion matrix as a heatmap
+library(ggplot2)
+ggplot(conf_matrix_RFC, aes(Prediction, Reference, fill = log(Freq))) +
+  geom_tile() +
+  scale_fill_gradient(low = "red", high = "blue", na.value = "grey50", trans = "log") +
+  geom_text(aes(label = Freq), size = 10, color = "white") +
+  xlab("Predicted Class") +
+  ylab("True Class") +
+  ggtitle("Confusion Matrix") +
+  theme_minimal()
+
+```
+
+
+
+
+
+Decision Tree Classification
+
+```{r}
+library(rpart)
+# fit Decision Tree model
+DecisiontreeModel <- rpart(target ~., data=train, method="class")
+summary(DecisiontreeModel)
+
+library(rpart.plot)
+# plot Decision Tree
+rpart.plot(DecisiontreeModel)
+```
+
+
+```{r}
+# make predictions on testing set
+predictions_Decision_tree <- predict(DecisiontreeModel, test, type="class")
+
+# evaluate model performance
+conf_matix_Decision_tree <- confusionMatrix(predictions_Decision_tree, test$target)
+conf_matix_Decision_tree
+
+# Extract the accuracy metric
+accuracy_decision_tree <- conf_matix_Decision_tree$overall['Accuracy']
+accuracy_decision_tree
+```
+
+
+
+```{r}
+# Assuming conf_matrix is a table object created by confusionMatrix()
+conf_matrix_Decision_tree <- as.data.frame(conf_matix_Decision_tree$table)
+
+# Plot confusion matrix as a heatmap
+library(ggplot2)
+ggplot(conf_matrix_Decision_tree, aes(Prediction, Reference, fill = log(Freq))) +
+  geom_tile() +
+  scale_fill_gradient(low = "red", high = "blue", na.value = "grey50", trans = "log") +
+  geom_text(aes(label = Freq), size = 10, color = "white") +
+  xlab("Predicted Class") +
+  ylab("True Class") +
+  ggtitle("Confusion Matrix") +
+  theme_minimal()
+
+```
+
+
+
+
+Printing all the classification Accuracies
+```{r}
+cat("Accuracy of Logistic Classification:", accuracy_logistic_classification, "\n")
+cat("Accuracy of KNN Classification:", accuracy_knn_classification, "\n")
+cat("Accuaracy of Random Forest Classification:", rf_acc, "\n")
+cat("Accuracy of Decision Tree Classification:", accuracy_decision_tree, "\n")
+```
+
+
+```{r}
+library(ggplot2)
+library(RColorBrewer)
+
+# create a data frame with the model names and accuracies
+models <- c("Logistic Regression", "KNN", "Random Forest", "Decision Tree")
+accuracies <- c(accuracy_logistic_classification, accuracy_knn_classification, rf_acc, accuracy_decision_tree)
+Classifications_accuracies_df <- data.frame(models, accuracies)
+
+# specify the color palette
+colors <- brewer.pal(length(models), "Set1")
+
+# create the bar plot with the specified colors
+ggplot(Classifications_accuracies_df, aes(x = models, y = accuracies, fill = models)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_fill_manual(values = colors) +
+  ylim(0,1) +
+  ggtitle("Classification Model Accuracies") +
+  xlab("Model") +
+  ylab("Accuracy") +
+  theme_minimal() + geom_text(aes(label = round(accuracies, 2)), vjust = -0.5, color = "steelblue")
+
+```
+
+
+
+
+2) RESEARCH QUESTION
+Do patients with heart disease have significantly higher mean blood pressure compared to patients without heart disease?
+
+
+To compare the mean blood pressure between patients with and without heart disease in R, you can use the t-test. 
+```{r}
+# Load the required package for reading the dataset
+library(readr)
+
+# Separate the blood pressure values for patients with and without heart disease
+bp_with_heart_disease <- heart_df$trestbps[heart_df$target == 1]
+
+bp_without_heart_disease <- heart_df$trestbps[heart_df$target == 0]
+
+# Perform the t-test
+result <- t.test(bp_with_heart_disease, bp_without_heart_disease)
+summary(result)
+# Print the t-test results
+cat("t-Statistic:", result$statistic, "\n")
+cat("p-value:", result$p.value, "\n")
+
+```
+t-Statistic: -4.465215
+
+The t-statistic represents the calculated value of the t-test. In this case, the t-statistic is -4.465215. The sign indicates the direction of the difference between the means (whether one group has a higher mean than the other), and the magnitude represents the size of the difference.
+
+p-value: 8.922492e-06
+
+The p-value is a measure of the evidence against the null hypothesis. In this case, the p-value is 8.922492e-06, which is very small. The "e-06" represents scientific notation, and it means that the p-value is extremely close to zero (e.g., 0.000008922492).
+The small p-value suggests strong evidence to reject the null hypothesis, which typically states that there is no difference between the means of the two groups. In this case, it indicates that there is a significant difference in mean blood pressure between patients with and without heart disease.
+Since the p-value is less than the commonly used significance level of 0.05 (or 0.01), it indicates that the observed difference in mean blood pressure is unlikely to have occurred by chance alone, assuming the null hypothesis is true.
+In summary, the t-test output suggests that there is a statistically significant difference in mean blood pressure between patients with and without heart disease, with the t-statistic indicating the direction and magnitude of the difference.
+
+
+
+
+
+
+
+Effect size calculation: Although the t-test determines whether there is a significant difference, it does not provide information about the magnitude of the difference. You can calculate an effect size measure, such as Cohen's d or Hedges' g, to quantify the practical significance of the difference. This will help you understand the practical significance of the observed effect.
+```{r}
+# Load the required package for effect size calculation
+library(effsize)
+
+# Calculate Cohen's d
+cohen_d <- cohen.d(bp_with_heart_disease, bp_without_heart_disease)
+summary(cohen_d)
+# Print the effect size measures
+cohen_d
+
+```
+The output suggests the following information regarding Cohen's d:
+
+Cohen's d estimate: -0.2800787
+The calculated value of Cohen's d is -0.2800787. Cohen's d represents the standardized difference between the means of the two groups (patients with heart disease and those without heart disease). In this case, the negative sign indicates that patients without heart disease have, on average, slightly higher blood pressure than those with heart disease.
+95 percent confidence interval:
+The confidence interval provides a range of plausible values for the true effect size in the population. In this case, the 95 percent confidence interval for Cohen's d is (-0.4033036, -0.1568539). This means that we can be 95 percent confident that the true value of Cohen's d falls within this interval.
+Interpretation:
+The magnitude of Cohen's d is typically interpreted as follows:
+A small effect size: Cohen's d around 0.2.
+A medium effect size: Cohen's d around 0.5.
+A large effect size: Cohen's d of 0.8 or higher.
+In this case, with Cohen's d estimated as -0.2800787, it falls within the small effect size range. This suggests that the difference in mean blood pressure between patients with and without heart disease is relatively small, but still statistically significant.
+
+
+
+
+
+
+
+
+```{r}
+# Load the required packages
+library(ggplot2)
+library(dplyr)
+
+# Calculate mean and standard error for each group
+mean_with_heart_disease <- mean(bp_with_heart_disease)
+mean_without_heart_disease <- mean(bp_without_heart_disease)
+se_with_heart_disease <- sd(bp_with_heart_disease) / sqrt(length(bp_with_heart_disease))
+se_without_heart_disease <- sd(bp_without_heart_disease) / sqrt(length(bp_without_heart_disease))
+
+mean_with_heart_disease
+mean_without_heart_disease
+se_with_heart_disease
+se_without_heart_disease
+
+# Create a data frame for plotting
+df_group_mean_se <- data.frame(
+  Group = c("With Heart Disease", "Without Heart Disease"),
+  Mean = c(mean_with_heart_disease, mean_without_heart_disease),
+  SE = c(se_with_heart_disease, se_without_heart_disease)
+)
+
+# Plot the bar plot with error bars
+ggplot(df_group_mean_se, aes(x = Group, y = Mean, fill = Group)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.5) +
+  geom_errorbar(aes(ymin = Mean - SE, ymax = Mean + SE), width = 0.2) +
+  labs(x = "Group", y = "Mean Blood Pressure") +
+  ggtitle("Comparison of Mean Blood Pressure") +
+  theme_minimal() +
+  geom_text(aes(label = sprintf("%.2f", Mean)), vjust = 15.0, color = "black", size = 4, position = position_dodge(width = 0.5)) +
+  geom_text(aes(y = Mean + SE + 1, label = sprintf("SE: %.2f", SE)), color = "black", size = 5, position = position_dodge(width = 0.5))
+
+```
+
+```{r}
+cat("mean with heart disease:",mean_with_heart_disease,"\n")
+cat("mean without heart disease:", mean_without_heart_disease,"\n")
+cat("se with heart disease:", se_with_heart_disease,"\n")
+cat("se without heart disease:", se_without_heart_disease,"\n")
+```
+
+This visualization directly compares the mean blood pressure for each group using bars. The inclusion of error bars provides a visual representation of the uncertainty or variability around the mean estimates. If the error bars do not overlap or show minimal overlap, it visually indicates a significant difference in mean blood pressure between the two groups. This clear visual distinction allows viewers to immediately understand the significant difference.
+By using a bar plot with error bars, you can effectively communicate the key finding that patients with heart disease have a significantly higher mean blood pressure compared to patients without heart disease. Make sure to include appropriate labels, legends, and statistical annotations (such as asterisks denoting the significance level or p-value) to enhance the clarity and interpretability of the visualization.
